@@ -3,106 +3,49 @@
 /*                                                        :::      ::::::::   */
 /*   server.c                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: bschroed <bschroed@student.42.us.org       +#+  +:+       +#+        */
+/*   By: bschroed <bschroed@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2017/04/23 00:22:58 by bschroed          #+#    #+#             */
-/*   Updated: 2017/04/23 00:26:20 by bschroed         ###   ########.fr       */
+/*   Updated: 2017/06/06 20:49:35 by rmatos           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ftdb.h"
 
-void	error(char *msg)
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <stdio.h>
+#include<string.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main()
 {
-	perror(msg);
-	exit(1);
-}
 
-void handleRequest(int sock, FILE *fp)
-{
-	int 	n;
-	time_t 	t;
-	char 	buffer[256];
-	char	*ret;
+    char str[100];
+    int listen_fd, comm_fd;
 
-	time(&t);
-	fp = fopen("log.txt", "a+");
-	while(1)
-	{
-		bzero(buffer, 256);
-		n = read(sock, buffer, 255);
-		if (n < 0)
-			error("ERROR reading from socket");
-		if (strncmp(buffer, "quit", 4) == 0)
-		{
-			close(sock);
-			fclose(fp);
-			return;
-		}
-		else
-		{
-			printf("Command: %s", buffer);
-			fprintf(fp, "%sFT_DB> %s\n", ctime(&t), buffer);
+    struct sockaddr_in servaddr;
 
-			//call code here
-		}
-		if (n < 0)
-			error("ERROR writing to socket");
-	}
-}
+    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-int		not_main(int argc, char *argv[])
-{
-	FILE			*fp;
-	int				sockfd;
-	int				newsockfd;
-	int				portno;
-	int				pid;
-	unsigned int	clilen;
-	struct			sockaddr_in serv_addr;
-	struct			sockaddr_in cli_addr;
-	if (argc < 2)
-	{
-		fprintf(stderr, "Error, no port provided\n");
-		exit(1);
-	}
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0)
-		error("ERROR opening socket");
-	bzero((char *) &serv_addr, sizeof(serv_addr));
-	portno = atoi(argv[1]);
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(portno);
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(sockfd, (struct sockaddr *) &serv_addr,
-		sizeof(serv_addr)) < 0)
-			error("ERROR on binding");
-	listen(sockfd, 128);
-	clilen = sizeof(cli_addr);
-	fp = fopen("log.txt", "a+");
-	fclose(fp);
-	while (1)
-	{
-		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-		if (newsockfd < 0)
-			error("ERROR on accept");
-		else
-		{
-			fopen("log.txt", "a+");
-			fprintf(fp, "CLIENT IP: %s\n", inet_ntoa(cli_addr.sin_addr));
-			fclose(fp);
-		}
-		pid = fork();
-		if (pid < 0)
-			error("ERROR on fork");
-		if (pid == 0)
-		{
-			close(sockfd);
-			handleRequest(newsockfd, fp);
-			exit(0);
-		}
-		else
-			close(newsockfd);
-	}
-	return (0);
+    bzero( &servaddr, sizeof(servaddr));
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htons(INADDR_ANY);
+    servaddr.sin_port = htons(22000);
+
+    bind(listen_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    listen(listen_fd, 10);
+    comm_fd = accept(listen_fd, (struct sockaddr*) NULL, NULL);
+	long size;
+	read(comm_fd, &size, sizeof(long));
+	printf("%li\n", (long)size);
+	int wav_fd = open("new_wav.wav", O_RDWR|O_CREAT);
+	void *data;
+	data = malloc(size);
+	read(comm_fd, data, size);
+	write(wav_fd, data, size);
 }
